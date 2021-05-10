@@ -1,17 +1,24 @@
 package kr.hs.youtubewebsc
 
-import android.os.Parcelable
-import android.text.Html
+import android.os.AsyncTask
+import androidx.lifecycle.ViewModel
+import com.google.gson.annotations.SerializedName
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.ResponseBody
+import okhttp3.logging.HttpLoggingInterceptor
 import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import java.io.Serializable
-import java.net.URL
-import java.util.*
+import org.jsoup.select.Elements
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.GET
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 import kotlin.collections.ArrayList
 
-class Scrapping {
-    var FLAG = true
+class Scrapping(val url: String): AsyncTask<Void, Void, Void>() {
     private lateinit var ytList: ArrayList<ytObj>
 
     class ytObj {
@@ -38,13 +45,49 @@ class Scrapping {
         }
     }
 
-    // NW를 통한 작업이라 비동기식으로 구현
-    constructor(url: String) {
-        Thread(Runnable {
-            // 참고 Jsoup: https://jsoup.org/apidocs/org/jsoup/nodes/Element.html
-            val doc = Jsoup.connect(url).get()
-            val first = doc.getElementById("header-container")
-            val mov_li = first.getElementsByTag("ytd-video-renderer")
+    class Networking {
+        fun createClient(): OkHttpClient {
+            return OkHttpClient.Builder()
+                    .connectTimeout(30L, TimeUnit.SECONDS)
+                    .readTimeout(15L, TimeUnit.SECONDS)
+                    .writeTimeout(15L, TimeUnit.SECONDS)
+                    .build()
+        }
+
+        inline fun <reified T> createWebService(okHttpClient: OkHttpClient, url: String) : T{
+            val retrofit = Retrofit.Builder()
+                    .baseUrl(url)
+                    .client(okHttpClient)
+                    // For json parser
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build()
+
+            return retrofit.create(T::class.java)
+        }
+    }
+
+    override fun doInBackground(vararg params: Void?): Void? {
+        try {
+            val doc = Jsoup.connect(url).get().body().allElements.tagName("ytd-app").first()
+            println(" - isBlock: ${doc.isBlock}")
+            println(" - doc: $doc")
+
+            val first: Element? = doc.getElementsByTag("div").first()
+            println("   - first: $first")
+
+            // 이 이상으로 코드를 가져오지 못함
+            // --> 특정 영상 페이지의 메타 데이터는 <head>에서 가져올 수 있음
+            //     근데 meta data가 제대로 작성되지 않은 콘텐츠도 있음
+            //     그래서 유튜브 API를 사용해서 DB에 저장하고 사용하는 게 좋겠다
+            val second = first?.getElementsByTag("ytd-page-manager")?.first()?.getElementsByTag("div")?.first()
+            println("   - second: $second")
+            val third = second?.getElementsByTag("ytd-section-list-renderer")?.first()
+            println("   - third: $third")
+
+            val firstRender = third?.getElementsByTag("ytd-item-section-renderer")?.first()
+            println("   - firstRender: $firstRender")
+            val mov_li = firstRender?.getElementsByTag("ytd-video-renderer")
+            println("   - mov_li: $mov_li")
 
             // works에 저장
             ytList = ArrayList<ytObj>()
@@ -56,13 +99,19 @@ class Scrapping {
 //            }
 
             // 2) forEach 이용
-            mov_li.forEach { item ->
+            mov_li?.forEach { item ->
                 // 요소 중 안에 같은 태그가 있으면 continue
                 ytList.add(scrapYTlist(item))
             }
 
-            FLAG = false
-        })
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+        return null
+    }
+
+    override fun onPreExecute() {
+        super.onPreExecute()
     }
 
     fun get_YTlist(): ArrayList<ytObj> {
