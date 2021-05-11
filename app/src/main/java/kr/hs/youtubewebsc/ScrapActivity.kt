@@ -20,12 +20,12 @@ class ScrapActivity : Activity() {
         searchBtn = findViewById(R.id.searchBtn)
 
         searchBtn.setOnClickListener {
-            searchByKeyword += searchText.text
+            searchByKeyword = searchByKeyword + searchText.text
 
             if (searchText.text.equals("요가")) {
                 // case 1
                 searchByKeyword = "https://www.youtube.com/watch?v=ezEs6sbSsOg"
-            } else if (searchText.text.equals("요가 짧게")) {
+            } else if (searchText.text.equals("2")) {
                 // case 2
                 searchByKeyword = "https://youtu.be/ezEs6sbSsOg"
             }
