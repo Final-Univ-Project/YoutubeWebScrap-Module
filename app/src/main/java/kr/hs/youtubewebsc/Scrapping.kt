@@ -9,6 +9,7 @@ import okhttp3.Response
 import okhttp3.ResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.select.Elements
 import retrofit2.Retrofit
@@ -68,41 +69,48 @@ class Scrapping(val url: String): AsyncTask<Void, Void, Void>() {
 
     override fun doInBackground(vararg params: Void?): Void? {
         try {
-            val doc = Jsoup.connect(url).get().body().allElements.tagName("ytd-app").first()
+            val doc = Jsoup.connect(url).get().head()
+            // get().body().allElements.tagName("").first()
             println(" - isBlock: ${doc.isBlock}")
             println(" - doc: $doc")
 
-            val first: Element? = doc.getElementsByTag("div").first()
+            val first: Element? = doc.getElementsByTag("ytd-app").first()
             println("   - first: $first")
+            val tmp = doc.select("ytd-app")
+            println("   - tmp (${first?.equals(tmp)}): $tmp")
 
             // 이 이상으로 코드를 가져오지 못함
             // --> 특정 영상 페이지의 메타 데이터는 <head>에서 가져올 수 있음
             //     근데 meta data가 제대로 작성되지 않은 콘텐츠도 있음
             //     그래서 유튜브 API를 사용해서 DB에 저장하고 사용하는 게 좋겠다
-            val second = first?.getElementsByTag("ytd-page-manager")?.first()?.getElementsByTag("div")?.first()
-            println("   - second: $second")
-            val third = second?.getElementsByTag("ytd-section-list-renderer")?.first()
-            println("   - third: $third")
+            val second = first?.getElementsByTag("title")?.first()
+            println("   - second(title): $second")
+            val third: Elements? = first?.getElementsByTag("meta")
+            println("   - third(meta): $third")
 
-            val firstRender = third?.getElementsByTag("ytd-item-section-renderer")?.first()
-            println("   - firstRender: $firstRender")
-            val mov_li = firstRender?.getElementsByTag("ytd-video-renderer")
-            println("   - mov_li: $mov_li")
+            if (third != null) {
+                for (li in third) {
+                    val desc = third.attr("name")
+                    println("   - desc: $desc")
+                    val keywords = third.attr("content")
+                    println("   - keywords: $keywords")
+                }
+            }
 
-            // works에 저장
-            ytList = ArrayList<ytObj>()
-
-            // 1) for문 이용
-//            for (item in mov_li) {
+//            // works에 저장
+//            ytList = ArrayList<ytObj>()
+//
+//            // 1) for문 이용
+////            for (item in mov_li) {
+////                // 요소 중 안에 같은 태그가 있으면 continue
+////                ytList.add(scrapYTlist(item))
+////            }
+//
+//            // 2) forEach 이용
+//            mov_li?.forEach { item ->
 //                // 요소 중 안에 같은 태그가 있으면 continue
 //                ytList.add(scrapYTlist(item))
 //            }
-
-            // 2) forEach 이용
-            mov_li?.forEach { item ->
-                // 요소 중 안에 같은 태그가 있으면 continue
-                ytList.add(scrapYTlist(item))
-            }
 
         } catch (e: IOException) {
             e.printStackTrace()
